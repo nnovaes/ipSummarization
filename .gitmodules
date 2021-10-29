@@ -1,0 +1,3 @@
+[submodule "Indented.Net.IP"]
+	path = Indented.Net.IP
+	url = https://github.com/indented-automation/Indented.Net.IP.git
