@@ -1,5 +1,6 @@
 FROM golang
-ENV OOS=linux GOARCH=amd64 
+ENV OOS linux
+ENV GOARCH amd64 
 COPY cidr-convert/ /cidr-convert/
 WORKDIR /cidr-convert
 RUN go build cidr-convert.go
