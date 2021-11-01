@@ -1,4 +1,15 @@
 
+
+function cidrConvert {
+    param (
+        [Parameter(Mandatory = $true)]
+        $list
+    )
+    $list | Set-Content ./temp
+    $summarized = (cat ./temp | cidr-convert)
+    return $summarized
+}
+
 # convert a short range format like 1.1.1.100-200 to 1.1.1.100-1.1.1.200
 function convertShortRange {
 
