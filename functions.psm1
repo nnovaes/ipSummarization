@@ -7,6 +7,8 @@ function cidrConvert {
     )
     $list | Set-Content ./temp
     $summarized = (cat ./temp | cidr-convert)
+    try {rm ./temp}
+    catch {}
     return $summarized
 }
 
