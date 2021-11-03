@@ -6,7 +6,7 @@ function cidrConvert {
         $list
     )
     $list | Set-Content ./temp
-    $summarized = (cat ./temp | cidr-convert)
+    $summarized = (cat ./temp | ./cidr-convert/cidr-convert)
     try {rm ./temp}
     catch {}
     return $summarized
@@ -108,4 +108,81 @@ function processIPList {
     }
 
     return $ipList,$ipListInvalid
+}
+
+#extract address from range
+function extractIP {
+    param (
+        [Parameter(Mandatory = $true)]
+        [String] $extract,
+
+        [Parameter(Mandatory = $true)]
+        [String] $network
+    )
+
+
+    $extractLoad = $extract.Split(",")[1]
+    $networkLoad = $network.Split(",")[1]
+
+    $extract = $extract.Split(",")[0]
+    $network = $network.Split(",")[0]
+
+    $extract = Get-NetworkSummary $extract
+    $network = Get-NetworkSummary $network
+
+    $extract = Get-NetworkRange $extract.CIDRNotation # this will hold all hosts to be removed from the network
+    $network = Get-NetworkRange $network.CIDRNotation # this will hold all hosts in the network
+    
+
+    foreach ($address in $network)
+    {
+        if ($extract -contains $address)
+        {
+            $address | Add-Member -NotePropertyName exclude -NotePropertyValue $true -Force
+        }
+        else {
+            $address | Add-Member -NotePropertyName exclude -NotePropertyValue $false -Force
+        }
+    }
+
+    $newNetwork = $network | Where-Object {$_.exclude -eq $false}
+    $newNetwork = $newNetwork | Select-Object -Property "IPAddressToString" 
+    $newNetwork = $newNetwork | Select-Object -First 100
+    rm ./temp
+    foreach ($item in $newNetwork) {
+        $item.IPAddressToString | Add-Content ./temp
+    }
+    $newNetwork = Get-Content ./temp
+    rm ./temp
+    
+    $newNetwork = cidrConvert $newNetwork
+
+    #addBackLoad
+    for ($i=0; $i -lt $newNetwork.Count; $i++)
+    {
+        $newNetwork[$i] = $newNetwork[$i]+","+$networkLoad
+    }
+
+    return $newNetwork
+
+}
+
+function extractionNeeded {
+    # determine if extraction is neded
+    param (
+        [Parameter(Mandatory = $true)]
+        $list
+    )
+    $list = Get-Content ./examples/sample_ip_list_extract.txt
+   
+    for ($i=0; $i -lt $list.Count; $i++)
+    {
+        for ($j=0; $j -lt $list.Count; $j++)
+        {
+            $compare = ($list[$i].extraction -or (Test-SubnetMember -SubjectIPAddress $list[$i] -ObjectIPAddress $list[$j])) -and ($list[$i] -ne $list[$j])
+            Write-Host $compare , $list[$i], $list[$j]
+            $list[$i] | Add-Member -NotePropertyName "extraction" -NotePropertyValue ($compare) -Force
+        }
+        
+    }
 }

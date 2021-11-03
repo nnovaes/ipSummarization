@@ -13,7 +13,7 @@
         - IP Address Short-range (i.e. 192.168.1.10-20)
 
 * Run the docker image, mapping the volume where the input/output will be located and the filename. The output will be the `filename_valid_<timestamp>.txt`for summarized addresses and `filename_invalid_<timestamp>.txt` for invalid addresses/entries. Example:
-    `docker run -it -v <srcdir>:/summarize normannovaes/ipsum sample_ip_list_big.txt`
+    `docker run -it -v <srcdir>:/summarize/data normannovaes/ipsum sample_ip_list_big.txt`
 
 ## Summarize with load distribution
 
@@ -34,4 +34,4 @@ If there's a need for distributing summarized IPs between load balanced nodes (y
 
 
 * Run the docker image, mapping the volume where the input/output will be located and the filename. The output will be the `filename_valid_<timestamp>.txt`for summarized addresses and `filename_invalid_<timestamp>.txt` for invalid addresses/entries. You must past the number of nodes as an additional parameter (4 nodes in the example below). Example:
-    `docker run -it -v <srcdir>:/summarize normannovaes/ipsum sample_ip_list_big_load.txt 4`
+    `docker run -it -v <srcdir>:/summarize/data normannovaes/ipsum sample_ip_list_big_load.txt 4`

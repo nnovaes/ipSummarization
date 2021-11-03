@@ -1,9 +1,9 @@
-Import-Module /script/functions.psm1
+Import-Module ./script/functions.psm1
 
 if ($args[1] -gt 0)
 {
     #with load
-    $in = Import-Csv ("/summarize/"+$args[0])
+    $in = Import-Csv ("./data/"+$args[0])
     #$in = Import-Csv ./sample_ip_list_big_load.txt
     $in = $in | Sort-Object -Property "address" -Unique
     
@@ -126,13 +126,13 @@ elseif ($args[1] -eq 0)
 }
 else {
 #without load
-$in = Get-Content ("/summarize/"+$args[0])
+$in = Get-Content ("./data/"+$args[0])
 $list = (processIPList -list $in)
 $valid = $list[1]
 $invalid = $list[0]
 $date = (Get-Date -Format "MM-dd-yy_hhmmss").ToString()
-$outPathValid = ("/summarize/"+$args[0].Split(".")[0]+"_summarized_"+$date+".txt")
-$outPathInvalid = ("/summarize/"+$args[0].Split(".")[0]+"_invalid_"+$date+".txt")
+$outPathValid = ("./data/"+$args[0].Split(".")[0]+"_summarized_"+$date+".txt")
+$outPathInvalid = ("./data/"+$args[0].Split(".")[0]+"_invalid_"+$date+".txt")
 $invalid | Set-Content $outPathInvalid
 cidrConvert -list $valid | Set-Content $outPathValid
 
