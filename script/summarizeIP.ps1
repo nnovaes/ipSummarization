@@ -1,11 +1,38 @@
 Import-Module ./script/functions.psm1 -Force
 
+if ($args[2] -eq "--cleanup")
+{
+    Remove-Item "./data/*.list"
+}
+
 if ($args[1] -gt 0)
 {
     #with load
-    $in = Import-Csv ("./data/"+$args[0])
-    #$in = Import-Csv ./sample_ip_list_big_load.txt
-    $in = $in | Sort-Object -Property "address" -Unique
+    $import = Import-Csv ("./data/"+$args[0])
+    $import = Sort-Object -Property 'address'
+    #$import = Import-Csv ./sample_ip_list_big_load.txt
+    
+
+    $listhash = $null
+    $listhash = @{}
+    foreach ($line in $import)
+    {
+        if ($listhash[$line.Address] -eq $null)
+        {
+            Write-Host "Adding " $line.Address
+            $listhash.Add($line.Address,$line)
+        }
+        else 
+        {
+            Write-Host "Merging " $line.Address "previous load of " $listhash[$line.Address].load "with load " $line.load
+            $lineload = [Int]$listhash[$line.Address].load+[Int]$line.load
+            $listhash[$line.Address].load = $lineload
+        }
+    }
+
+    $in = $listhash.Values
+    #$in = $import
+
     
     #convert list to ips
     [System.Collections.ArrayList]$inputList= @()
@@ -15,7 +42,7 @@ if ($args[1] -gt 0)
         if ($line.address -match ".*-.*")
         {
             #convert
-            $converted = $line.address | cidr-convert
+            $converted = $line.address | /usr/bin/cidr-convert
             foreach ($item in $converted) {
                 $newitem = New-Object -TypeName PSObject -Property @{
                     address = (Get-NetworkSummary $item).CIDRNotation
@@ -74,18 +101,22 @@ if ($args[1] -gt 0)
     {
 
         [System.Collections.ArrayList]$thisNodeAddresses= @()
+        [System.Collections.ArrayList]$thisNodeAddressesWithLoad= @()
         $thisNode = New-Object -TypeName PSObject -Property @{
             'load' = 0
             'addresses' = $null
-            'nodeName'= "node_"+$i      
+            'nodeName'= "node_"+$i
+            'addressesWithLoad' = $null      
         }
         while ($thisNode.load -lt $loadPerNode -and $addList.Count -gt 0)
         {
             $thisNodeAddresses.Add($addList[0].address) > $null
+            $thisNodeAddressesWithLoad.Add($addList[0]) > $null
             $thisNode.load = $thisNode.load + $addList[0].pload
             $addList.RemoveAt(0)
         }
         $thisNode.addresses = $thisNodeAddresses
+        $thisNode.addressesWithLoad = $thisNodeAddressesWithLoad
         $nodeList.Add($thisNode) > $null
     }
 
@@ -99,19 +130,33 @@ if ($args[1] -gt 0)
     $date = (Get-Date -Format "MM-dd-yy_hhmmss").ToString()
     foreach ($node in $nodeList)
     {
-        $path = "/summarize/"+$node.nodeName+"_"+$date+".list"
-        try {rm $path}
-        catch {}
+        $path1 = "/summarize/data/"+$node.nodeName+"_"+$date
+        try {
+            Remove-Item $path -ErrorAction Stop
+            }
+        catch {
+
+        }
+        $path = $path1+".results.list"
         "node: "+$node.nodeName | Add-Content $path
         "load: "+$node.load | Add-Content $path
         "count of addresses: "+$node.addresses.Count | Add-Content $path
         "count of summarized addresses: "+$node.summarized.Count | Add-Content $path
         " " | Add-Content $path
+        $path = $path1+".original.list"
         "ORIGINAL ADDRESSES: " | Add-Content $path
         foreach ($addr in $node.addresses) {
             $addr | Add-Content $path
         }
         " " | Add-Content $path
+        $path = $path1+".loads.list"
+        "ORIGINAL LOADS: " | Add-Content $path
+        "address,initial_load,hosts,weightedLoad" | Add-Content $path
+        foreach ($addr in $node.addressesWithLoad) {
+            $addr.address+","+$addr.load+","+$addr.hosts+","+$addr.pload | Add-Content $path
+        }
+        " " | Add-Content $path
+        $path = $path1+".summarized"
         "SUMMARIZED: " | Add-Content $path
         foreach ($summ in $node.summarized) {
             $summ | Add-Content $path

@@ -25,13 +25,12 @@ RUN apt-get install -y bash
 COPY ./script/* /summarize/script
 COPY ./examples/* /summarize/data
 
-ENTRYPOINT [ "/bin/bash" ]
 
-# WORKDIR /summarize
-# COPY ./script/* /summarize/script/
-# COPY *.txt /summarize/data/
-# COPY summarizeIP.sh /summarize/script/
-# RUN chmod +x /summarize/script/*.ps1 && chmod +x /summarize/script/*.sh
-# ENTRYPOINT [ "/summarize/script/summarizeIP.sh"]
+
+WORKDIR /summarize
+RUN chmod +x /summarize/script/*.ps1 && chmod +x /summarize/script/*.sh
+
+#ENTRYPOINT [ "/bin/bash" ]
+ENTRYPOINT [ "/summarize/script/summarizeIP.sh"]
 
 

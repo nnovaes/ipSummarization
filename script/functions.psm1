@@ -41,6 +41,10 @@ function cidrConvert {
     return $summarized
 }
 
+
+
+
+
 function convertRange {
     param (
         $ip
@@ -64,11 +68,18 @@ function convertRange {
     return $convertedRange
 }
 
+
+
+
+
 function convertListRanges {
     param (
         $path
     )
 }
+
+
+
 
 # convert a short range format like 1.1.1.100-200 to 1.1.1.100-1.1.1.200
 function convertShortRange {
@@ -85,6 +96,9 @@ function convertShortRange {
     $rangeEnd = $rangeEnd[0]+"."+$rangeEnd[1]+"."+$rangeEnd[2]+"."+$range.Split("-")[1]
     Return $rangeStart+"-"+$rangeEnd
 }
+
+
+
 
 #validate if a given IP or range is an actual IP address
 function validateIP {
@@ -104,6 +118,8 @@ function validateIP {
     return $rTest, $result
 }
 
+
+
 function validateRange {
     param (
         [Parameter(Mandatory = $true)]
@@ -117,15 +133,33 @@ function validateRange {
     return $rTest,$range
 }
 
+
+
 #deduplicate list
 function dedupList {
+    
     param (
         [Parameter(Mandatory = $true)]
         $list
     )
-    $list = $list | Sort-Object -Unique -Property address
-    return $list
+    [System.Collections.ArrayList]$loadedList = @()
+    foreach ($line in $list)
+    {
+        
+            #add with basic load
+            $address = New-Object -TypeName PSObject -Property @{
+                address = (Get-NetworkSummary $line).CIDRNotation
+                load = 1
+            }
+            $loadedList.Add($address) > $null
+    }
+
+    $loadedList = $loadedList | Sort-Object -Unique -Property address
+    return $loadedList | foreach {$_.address}
 }
+
+
+
 
 function processIPList {
     param (

@@ -3,7 +3,7 @@
 * Docker based summarization of a list of IP addresses
 * Based on [CIDR-Convert](https://github.com/flowchartsman/cidr-convert) and [Indented.Net.IP](https://github.com/indented-automation/Indented.Net.IP)
 
-## Summarize
+## Simple summarization
 
 * Prepare the list to be summarized:
     - One entry per line
@@ -21,12 +21,25 @@ If there's a need for distributing summarized IPs between load balanced nodes (y
 
 * Prepare the list to be summarized:
     - One entry per line
-    - Each line contains a tuple of IP (in one of the supported formats below) and load. i.e. 
+    - First line contains the headers `address,load`
+    - Each subsequent line contains a tuple of IP (in one of the supported formats below) and load. i.e. 
         ```
         95.174.66.69/32,62
         95.174.66.71/32,70
         95.174.66.73/32,39
         ```
+    - If the list contains duplicates, their loads will be summed. i.e.
+    ```
+        95.174.66.69/32,60
+        95.174.66.69/32,60
+    ```
+
+    is the same as
+    ```
+        95.174.66.69/32,110
+    ```
+
+
     - Supported formats are:
         - IP Address in CIDR notation (i.e. 192.168.1.1/32). If the network mask is not provided the script will automatically assume it is a /32
         - IP Address Range (i.e. 192.168.1.1-192.168.10.254)

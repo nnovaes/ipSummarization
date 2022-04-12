@@ -1,2 +1,2 @@
 #!/bin/sh
-pwsh -File /summarize/summarizeIP.ps1 $1 $2
+pwsh -File /summarize/script/summarizeIP.ps1 $1 $2 $3
