@@ -1,2 +1,8 @@
 /cidr-convert_bin
 local.Dockerfile
+/examples/*.list
+/cidr-convert/*
+/Indented.Net.IP/*
+/cidr-convert/*/*
+/Indented.Net.IP/*/*
+temp.txt

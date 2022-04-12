@@ -99,7 +99,7 @@ if ($args[1] -gt 0)
     $date = (Get-Date -Format "MM-dd-yy_hhmmss").ToString()
     foreach ($node in $nodeList)
     {
-        $path = "/summarize/"+$node.nodeName+"_"+$date+".txt"
+        $path = "/summarize/"+$node.nodeName+"_"+$date+".list"
         try {rm $path}
         catch {}
         "node: "+$node.nodeName | Add-Content $path
@@ -131,8 +131,8 @@ $list = (processIPList -list $in)
 $valid = $list[1]
 $invalid = $list[0]
 $date = (Get-Date -Format "MM-dd-yy_hhmmss").ToString()
-$outPathValid = ("./data/"+$args[0].Split(".")[0]+"_summarized_"+$date+".txt")
-$outPathInvalid = ("./data/"+$args[0].Split(".")[0]+"_invalid_"+$date+".txt")
+$outPathValid = ("./data/"+$args[0].Split(".")[0]+"_summarized_"+$date+".list")
+$outPathInvalid = ("./data/"+$args[0].Split(".")[0]+"_invalid_"+$date+".list")
 $invalid | Set-Content $outPathInvalid
 cidrConvert -list $valid | Set-Content $outPathValid
 
