@@ -8,8 +8,8 @@ if ($args[2] -eq "--cleanup")
 if ($args[1] -gt 0)
 {
     #with load
-    $import = Import-Csv ("./data/"+$args[0])
-    $import = Sort-Object -Property 'address'
+    $import = Import-Csv ("./data/"+$args[0]) #| sort address 
+    #$import = Sort-Object -Property 'address'
     #$import = Import-Csv ./sample_ip_list_big_load.txt
     
 
@@ -30,8 +30,8 @@ if ($args[1] -gt 0)
         }
     }
 
-    $in = $listhash.Values
-    #$in = $import
+    #$in = $listhash.Values
+    $in = $import
 
     
     #convert list to ips
@@ -156,7 +156,7 @@ if ($args[1] -gt 0)
             $addr.address+","+$addr.load+","+$addr.hosts+","+$addr.pload | Add-Content $path
         }
         " " | Add-Content $path
-        $path = $path1+".summarized"
+        $path = $path1+".summarized.list"
         "SUMMARIZED: " | Add-Content $path
         foreach ($summ in $node.summarized) {
             $summ | Add-Content $path
