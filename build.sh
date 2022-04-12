@@ -1,2 +1,2 @@
-docker build -t normannovaes/ipsum -f Dockerfile .
-docker push normannovaes/ipsum
+docker build -t normannovaes/ipsum --platform linux/amd64 -f Dockerfile .
+#docker push normannovaes/ipsum

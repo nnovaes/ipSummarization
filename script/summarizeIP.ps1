@@ -1,4 +1,4 @@
-Import-Module ./script/functions.psm1
+Import-Module ./script/functions.psm1 -Force
 
 if ($args[1] -gt 0)
 {
