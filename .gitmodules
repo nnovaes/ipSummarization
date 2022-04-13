@@ -1,0 +1,3 @@
+[submodule "cidr-convert"]
+	path = cidr-convert
+	url = https://github.com/flowchartsman/cidr-convert.git

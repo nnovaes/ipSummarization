@@ -6,3 +6,4 @@ local.Dockerfile
 /cidr-convert/*/*
 /Indented.Net.IP/*/*
 temp.txt
+/examples/*.json

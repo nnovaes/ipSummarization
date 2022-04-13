@@ -8,37 +8,44 @@ if ($args[2] -eq "--cleanup")
 if ($args[1] -gt 0)
 {
     #with load
+    Write-Host "import original list"
     $import = Import-Csv ("./data/"+$args[0]) #| sort address 
+    $nodeCount = $args[1]
+   # $import = Import-Csv ./data/sample_ip_list_load.txt
+   # $nodeCount = 4
+   
     #$import = Sort-Object -Property 'address'
-    #$import = Import-Csv ./sample_ip_list_big_load.txt
+    
     
 
-    $listhash = $null
-    $listhash = @{}
-    foreach ($line in $import)
-    {
-        if ($listhash[$line.Address] -eq $null)
-        {
-            Write-Host "Adding " $line.Address
-            $listhash.Add($line.Address,$line)
-        }
-        else 
-        {
-            Write-Host "Merging " $line.Address "previous load of " $listhash[$line.Address].load "with load " $line.load
-            $lineload = [Int]$listhash[$line.Address].load+[Int]$line.load
-            $listhash[$line.Address].load = $lineload
-        }
-    }
+    # $listhash = $null
+    # $listhash = @{}
+    # foreach ($line in $import)
+    # {
+    #     if ($listhash[$line.Address] -eq $null)
+    #     {
+    #        # Write-Host "Adding " $line.Address
+    #         $listhash.Add($line.Address,$line)
+    #     }
+    #     else 
+    #     {
+    #        # Write-Host "Merging " $line.Address "previous load of " $listhash[$line.Address].load "with load " $line.load
+    #         $lineload = [Int]$listhash[$line.Address].load+[Int]$line.load
+    #         $listhash[$line.Address].load = $lineload
+    #     }
+    # }
 
     #$in = $listhash.Values
     $in = $import
 
     
     #convert list to ips
+    Write-Host "Converting to IPs"
     [System.Collections.ArrayList]$inputList= @()
     [System.Collections.ArrayList]$invalidList= @()
     foreach ($line in $in)
     {
+        Write-Host "Converting " $line
         if ($line.address -match ".*-.*")
         {
             #convert
@@ -46,8 +53,9 @@ if ($args[1] -gt 0)
             foreach ($item in $converted) {
                 $newitem = New-Object -TypeName PSObject -Property @{
                     address = (Get-NetworkSummary $item).CIDRNotation
-                    load = $line.load/$converted.Count
+                    load = [Int]($line.load/$converted.Count)
                     hosts = (Get-NetworkSummary $item).NumberOfAddresses
+                    sort = (Get-NetworkSummary $item).NetworkDecimal
                 }
                 $inputList.Add($newitem) > $null
             }
@@ -57,8 +65,9 @@ if ($args[1] -gt 0)
             try {
             $newitem = New-Object -TypeName PSObject -Property @{
                 address = (Get-NetworkSummary $line.address).CIDRNotation
-                load = $line.load
+                load = [Int]($line.load)
                 hosts = (Get-NetworkSummary $line.address).NumberOfAddresses
+                sort = (Get-NetworkSummary $line.address).NetworkDecimal
             }
                 $inputList.Add($newitem) > $null
         
@@ -66,102 +75,119 @@ if ($args[1] -gt 0)
 
             catch {
                 $invalidList.Add($line) > $null
+                Write-Host "invalid ip found: " $line
             }
             
         }
     }
+    $inputList = $inputList | Sort-Object -Property 'sort'
+ 
+
+    [System.Collections.ArrayList]$splitList= @()
+    
+    foreach ($address in $inputList)
+    {
+        Write-Host "splitting " $address "evenly among nodes"
+        $splitSubnets = splitSubnetEvenly -cidr $address.Address -nodes $nodeCount -load $address.load 
+        $splitList = $splitList + $splitSubnets
+    }
+
+    $inputList = $splitList | Sort-Object -Property 'sort'
 
     #calc load x hosts
     foreach ($address in $inputList)
     {
-        $address | Add-Member -NotePropertyName "pload" -NotePropertyValue ($address.load*$address.hosts) -Force
+        Write-Host "calculating weighted loads for" $address
+        $address | Add-Member -NotePropertyName "weightedLoad" -NotePropertyValue ([Int]$address.load*[Int]$address.hosts) -Force
     }
 
 
 
 
-    $nodeCount = $args[1]
-    $totalLoad = ($inputList | Measure-Object -Property pload -Sum).Sum
-    $loadPerNode = [math]::floor($totalLoad / $nodeCount)
-    if ($loadPerNode -lt ($inputList | Measure-Object -Property pload -Maximum).Maximum)
+
+
+    #copy input list, need to copy item by item otherwise inputlist is emptied
+    [System.Collections.ArrayList]$addList= @()
+    $addIndex = @{}
+    foreach($ilitem in $inputList)
     {
-        $loadPerNode = ($inputList | Measure-Object -Property pload -Maximum).Maximum
-    }
-
-        #copy input list, need to copy item by item otherwise inputlist is emptied
-        [System.Collections.ArrayList]$addList= @()
-        foreach($ilitem in $inputList)
+            Write-Host "adding" $ilitem.address "to master list"
+        if ($addIndex[$ilitem.address] -eq $null)
         {
-            $addList.add($ilitem) > $null
+        $addList.add($ilitem) > $null
+        $addIndex.Add($ilitem.address,($addList.Count-1))
         }
+        else {
 
-    [System.Collections.ArrayList]$nodeList= @()
-    #buildNewNodes
-    for ($i=0; $i -lt $nodeCount; $i++)
-    {
+            Write-Host $ilitem.address "duplicate found, searching index"
+            $index = $addIndex[$ilitem.address]
+            Write-Host "duplicate found, updating index for" $ilitem.address
+            $addList[$index].load = $addList[$index].load+$ilitem.load
+            $addList[$index].weightedLoad = $addList[$index].weightedLoad+$ilitem.weightedLoad
 
-        [System.Collections.ArrayList]$thisNodeAddresses= @()
-        [System.Collections.ArrayList]$thisNodeAddressesWithLoad= @()
-        $thisNode = New-Object -TypeName PSObject -Property @{
-            'load' = 0
-            'addresses' = $null
-            'nodeName'= "node_"+$i
-            'addressesWithLoad' = $null      
+            # for ($i=0; $i -lt $addList.count; $i++)
+            # {
+            #     if ($ilitem.address -eq $addList[$i].address)
+            #     {
+            #             $addList[$i].load = $addList[$i].load+$ilitem.load
+            #             $addList[$i].weightedLoad = $addList[$i].weightedLoad+$ilitem.weightedLoad
+            #     }
+            #     else 
+            #     {
+
+            #     }
+            # }
+
+      
         }
-        while ($thisNode.load -lt $loadPerNode -and $addList.Count -gt 0)
-        {
-            $thisNodeAddresses.Add($addList[0].address) > $null
-            $thisNodeAddressesWithLoad.Add($addList[0]) > $null
-            $thisNode.load = $thisNode.load + $addList[0].pload
-            $addList.RemoveAt(0)
-        }
-        $thisNode.addresses = $thisNodeAddresses
-        $thisNode.addressesWithLoad = $thisNodeAddressesWithLoad
-        $nodeList.Add($thisNode) > $null
+        
     }
 
-    #summarize
-    foreach ($node in $nodeList)
-    {
-        $node | Add-Member -NotePropertyName summarized -NotePropertyValue (cidrConvert -list $node.addresses) -Force
-    }
+    $addList = $addList | Sort-Object -Property 'sort'
 
-    #export
+    $nodeList = splitNodes -addList $addList -nodes $nodeCount
+
+
+    #exports
     $date = (Get-Date -Format "MM-dd-yy_hhmmss").ToString()
-    foreach ($node in $nodeList)
-    {
-        $path1 = "/summarize/data/"+$node.nodeName+"_"+$date
-        try {
-            Remove-Item $path -ErrorAction Stop
-            }
-        catch {
+    
+    ## original
 
-        }
-        $path = $path1+".results.list"
-        "node: "+$node.nodeName | Add-Content $path
-        "load: "+$node.load | Add-Content $path
-        "count of addresses: "+$node.addresses.Count | Add-Content $path
-        "count of summarized addresses: "+$node.summarized.Count | Add-Content $path
-        " " | Add-Content $path
-        $path = $path1+".original.list"
-        "ORIGINAL ADDRESSES: " | Add-Content $path
-        foreach ($addr in $node.addresses) {
-            $addr | Add-Content $path
-        }
-        " " | Add-Content $path
-        $path = $path1+".loads.list"
-        "ORIGINAL LOADS: " | Add-Content $path
-        "address,initial_load,hosts,weightedLoad" | Add-Content $path
-        foreach ($addr in $node.addressesWithLoad) {
-            $addr.address+","+$addr.load+","+$addr.hosts+","+$addr.pload | Add-Content $path
-        }
-        " " | Add-Content $path
-        $path = $path1+".summarized.list"
-        "SUMMARIZED: " | Add-Content $path
-        foreach ($summ in $node.summarized) {
-            $summ | Add-Content $path
+    $path = "./data/"+$date+".original.list"
+    $import | Export-Csv -Path ($path)
+    (gc ($path)) | % {$_ -replace '"', ''} | out-file ($path) -Fo -En ascii
+
+    # node summary
+    $path = "./data/"+$date
+    $nodeList.Values | Select-Object -Property nodeName,load,weightedLoad | ConvertTo-Json | Set-Content ($path+".results.json")
+
+    # node summary
+    $path = "./data/"+$date
+    $nodeList.Values  | ConvertTo-Json -Depth 10 | Set-Content ($path+".json")
+
+
+    foreach ($key in $nodeList.Keys)
+    {
+        $path = "./data/"+$date+"."+$nodeList[$key].nodeName
+        $nodeList[$key].addresses | Select-Object -Property address,load,hosts,weightedLoad | Export-Csv tmp.txt
+         (gc ("tmp.txt")) | % {$_ -replace '"', ''} | Add-Content ($path+".addresses.list")
+        rm tmp.txt
+    }
+
+
+    foreach ($key in $nodeList.Keys)
+    {
+        $path = "./data/"+$date+"."+$nodeList[$key].nodeName
+        foreach ($addr in $nodeList[$key].summarized)
+        {
+            $addr | Add-Content ($path+".summarized.list")
         }
     }
+
+    $outPathInvalid = ("./data/"+$date+".invalid.list")
+    $invalidList | Set-Content $outPathInvalid
+
+    
     
 }
 

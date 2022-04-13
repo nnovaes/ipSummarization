@@ -296,3 +296,164 @@ function scanExtraction {
     }
 }
 
+
+
+function splitSubnetEvenly {
+    param (
+        $cidr,
+        $nodes,
+        $load,
+        $sort
+            )
+
+   
+    $currentMask = [Int]($cidr -split "\/")[1]
+    $subnet = ($cidr -split "\/")[0]
+    $masks = @($currentMask..32)
+
+    $subnetList = @{}
+    foreach ($mask in $masks)
+    {
+        if ($mask -ge $currentMask)
+        {
+            $hosts = [Int]((Get-NetworkSummary ($subnet+"/"+$mask)).NumberOfHosts)
+            $summary = Get-NetworkSummary ($subnet+"/"+$mask)
+            try {
+                $subnetList.Add($hosts,$summary)
+            }
+            catch {}
+        }
+    }
+
+    $totalHosts = (Get-NetworkSummary $cidr).NumberOfHosts
+    $hostsPerNode = [math]::floor($totalHosts/$nodes)
+
+    $newMask = $currentMask
+   
+   for ($i=0; $i -lt $masks.Count; $i++)
+   {
+       $analyze = Get-NetworkSummary ($subnet+"/"+$masks[$i])
+       #Write-Host ($analyze.NumberOfHosts+2) "vs" ($hostsPerNode) "for " $masks[$i]
+       if ($analyze.NumberOfHosts+2 -lt $hostsPerNode )
+       {
+           $newMask = $masks[$i]
+           break
+       }
+       
+   }
+
+   $newSubnets = Get-Subnet $cidr -NewSubnetMask $newMask
+   $newLoad = [math]::ceiling($load/$newSubnets.Count)
+    [System.Collections.ArrayList]$splitSubnets= @()
+   foreach ($item in $newSubnets) {
+                $newitem = New-Object -TypeName PSObject -Property @{
+                    address = (Get-NetworkSummary $item).CIDRNotation
+                    load = $newLoad
+                    hosts = (Get-NetworkSummary $item).NumberOfAddresses
+                    sort = (Get-NetworkSummary $item).NetworkDecimal
+                }
+                $splitSubnets.Add($newitem) > $null
+            }
+    return $splitSubnets
+
+}
+
+
+function findIndex {
+    param (
+        $weightedLoad,
+        $limit,
+        $currentLoad
+    )
+
+
+    for ($i=0; $i -lt $weightedLoad.count; $i++)
+    {
+        if ($currentLoad+$weightedLoad[$i] -le $limit)
+        {
+            $result = $i
+            break;
+        }
+        elseif ($i -eq $weightedLoad.count-1)
+        {
+            $result = $i
+            break;
+        }
+        else {
+        }
+    }
+    return $result
+}
+
+function splitNodes {
+    param (
+        $addList,
+        $nodes
+    )
+
+ 
+    [System.Collections.ArrayList]$localList= @()
+
+    foreach ($entry in $addList)
+    {
+        $localList.Add($entry) > $null
+    }
+   
+#    $nodes = $nodeCount
+
+    $totalLoad = ($localList | Measure-Object -Property weightedLoad -Sum).Sum
+    $loadPerNode = [math]::ceiling($totalLoad/$nodes)
+  
+
+   
+    $nodeList = @{}
+    for ($i=0; $i -lt $nodes; $i++)
+    {
+    Write-Host "working on node_"+$i
+    $thisNode = New-Object -TypeName PSObject -Property @{
+            'load' = 0
+            'weightedLoad' = 0
+            'addresses' =  New-Object -TypeName 'System.Collections.ArrayList'
+            'nodeName'= "node_"+$i
+             
+        }
+
+        while ($thisNode.weightedLoad -le $loadPerNode -and $localList.count -gt 0)
+        {
+          
+            if (($thisNode.weightedLoad+$localList.Item(0).load) -lt $loadPerNode)
+            {
+                $thisNode.addresses.Add($localList.Item(0)) > $null
+                $thisNode.weightedLoad = $thisNode.weightedLoad+$localList.Item(0).weightedLoad
+                $thisNode.load = $thisNode.load+$localList.Item(0).load
+                $localList.Remove($localList.Item(0))
+            }
+            else
+            {
+            Write-Host "current load is" $thisNode.load "and " $localList.Item(0).address "of weightedLoad " $localList.Item(0).weightedLoad "would go beyond the " $loadPerNode "limit. Finding alternative"
+            $index = findIndex -weightedLoad ($localList | foreach {$_.weightedLoad}) -limit $loadPerNode -currentLoad $thisNode.weightedLoad
+            Write-Host "alternative found: "$localList.Item($index).address "with weightedLoad of " $localList.Item($index).weightedLoad
+            $thisNode.addresses.Add($localList.Item($index)) > $null
+            $thisNode.weightedLoad = $thisNode.weightedLoad+$localList.Item($index).weightedLoad
+            $thisNode.load = $thisNode.load+$localList.Item($index).load
+            $localList.Remove($localList.Item($index))
+            }
+        
+        }
+    
+    
+
+   
+    $nodeList.add($thisNode.nodename,$thisNode)    
+    }
+
+    foreach ($nodeKey in $nodeList.Keys)
+    {
+       $nodeList[$nodeKey] | Add-Member -NotePropertyName "plain_addresses" -NotePropertyValue ($nodeList[$nodeKey].addresses | Select-Object address | foreach {$_.address}) -Force
+       Write-Host "summarizing subnets for" $nodeKey
+       $nodeList[$nodeKey] | Add-Member -NotePropertyName "summarized" -NotePropertyValue (cidrConvert -list ($nodeList[$nodeKey].plain_addresses))
+    }
+
+    return $nodeList
+
+}
